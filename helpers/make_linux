@@ -1,0 +1,53 @@
+#!/bin/bash 
+
+VERSION="${1}"
+test -z ${VERSION} && exit 1 
+
+test -d /root/light-capricoin-release/helpers/release-packages/Linux \
+ && rm -rf /root/light-capricoin-release/helpers/release-packages/Linux
+cd /root/repo
+rm -rf build dist packages
+test -f /root/linux_installer.sh && rm /root/linux_installer.sh
+find ./ -name '*.pyc' | xargs rm
+
+set -xeo pipefail
+mkdir packages
+pip install  --target packages -r ../requirements.txt
+#pip install --upgrade --target packages -r ../requirements.txt
+cp  /root/light-capricoin-release/python-trezor/trezorctl packages/trezorctl.py
+cp -av /root/packages/google/__init__.py /root/repo/packages/google
+cp /root/light-capricoin-release/source/linux.spec /root/repo
+if [ -d ${TRAVIS_BUILD_DIR} ] ; then 
+  echo "Building on Travis - moving /root/repo because permissions"
+  test -d /repo || cp -av /root/repo /
+  cd /repo
+  su build -c 'pyinstaller --windowed linux.spec'
+  cp -av /repo /root/
+else 
+ su build -c 'pyinstaller --windowed linux.spec'
+fi
+cd /root/repo
+cd dist
+#mv light-capricoin Light-Capricoin-"${VERSION}"
+#put installer script in here
+mkdir /root/light-capricoin-release/helpers/release-packages/Linux
+sed -e 's/ELECTRUM_VERSION/'${VERSION}'/g' /root/linux_installer.in > /tmp/linux_installer.sh
+cp /tmp/linux_installer.sh /root
+chmod 755 /root/linux_installer.sh
+mkdir Light-Capricoin-${VERSION}
+mv light-capricoin Light-Capricoin-${VERSION}
+cp /root/repo/icons/light-capricoin.png Light-Capricoin-${VERSION}
+cp /root/repo/README-Linux-x86_64.md Light-Capricoin-${VERSION}
+cp /root/repo/LICENSE Light-Capricoin-${VERSION}
+cp /root/repo/RELEASE-NOTES Light-Capricoin-${VERSION}
+cp /root/repo/AUTHORS Light-Capricoin-${VERSION}
+cp /root/90-trezor.rules Light-Capricoin-${VERSION}
+cp /root/light-capricoin_linux_startup.sh Light-Capricoin-${VERSION}/light-capricoin.sh
+cp /root/repo/light-capricoin.desktop Light-Capricoin-${VERSION}
+sed -e '/tail/d' /root/linux_installer.sh > Light-Capricoin-${VERSION}/linux_installer.sh
+tar -cpzvf Light-Capricoin-"${VERSION}"_Linux_x86_64.tgz Light-Capricoin-"${VERSION}"
+cat /root/linux_installer.sh Light-Capricoin-"${VERSION}"_Linux_x86_64.tgz > /root/light-capricoin-release/helpers/release-packages/Linux/Light-Capricoin-"${VERSION}"_Linux_x86_64-Installer.bin
+chmod 555 /root/light-capricoin-release/helpers/release-packages/Linux/Light-Capricoin-"${VERSION}"_Linux_x86_64-Installer.bin
+
+#mv Light-Capricoin-"${VERSION}"_Linux-x86_64.tgz /root/light-capricoin-release/helpers/release-packages/Linux
+
